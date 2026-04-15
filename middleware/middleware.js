@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken")
 function authenticateTokenMiddleware(req, res, next){
     console.log(req.path)
-    if(req.path === "/signup" || req.path === "/login"){
+    if(req.path === "/signup" || req.path === "/login" || req.path === "/verify" || req.path === "/resend-email"){
         return next()
     }
     const authHeader = req.headers.authorization 
@@ -16,7 +16,7 @@ function authenticateTokenMiddleware(req, res, next){
                 "message":"Invalid token"
             })
         }
-        if(decoded.isVerified && req.path !=="/resend-email"){
+        if(decoded.isVerified && req.path !=="/resend-email" && req.path !=="/verify" && req.path !=="/login" && req.path !=="/signup"){
             return res.status(400).json({message:"User not verified,verify your account to contiune"})
         }
         req.user = decoded

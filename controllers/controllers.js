@@ -39,7 +39,7 @@ const signup = async(req, res)=>{
         }
     })
     const subject ="verify Your Email-TodoApp"
-    const text = "verify your email using the link:"+'${process.env.Base_URL}/verify?token=${token}'
+    const text = "verify your email using the link:"+ `${process.env.BASE_URL}/verify?token=${token}`
     await sendEmail(createdUser.email,subject,text)
     return res.status(200).json(createdUser)
     } catch (error) {
@@ -69,9 +69,6 @@ const login = async(req, res)=>{
     })
     if(!user){
         return res.status(404).json({message:"User not found"})
-    }
-    if(!user.isVerified){
-        return res.status(400).json({message:"Please verify your email First"})
     }
     const isValidPassword = await bcrypt.compare(password, user.password)
     if(!isValidPassword){
@@ -171,7 +168,7 @@ const resendEmail = async(req,res)=>{
             }
         })
         const subject = "verify Your Email-TodoApp"
-        const text = `Verify your email using the link:${process.env.BASE_URL}/verify?token+${token}`
+        const text = `Verify your email using the link:${process.env.BASE_URL}/verify?token=${token}`
 
         await sendEmail(req.user.email,subject,text)
 
@@ -187,7 +184,7 @@ catch(error){
 const getASingleTodo = async(req,res)=>{
     try{
         const todoId= parseInt(req.params.id)
-        
+
         const ownerOfTodo = await prisma.todo.findUnique({
             where:{id:todoId},
             select:{userId:true}
