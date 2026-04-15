@@ -1,14 +1,13 @@
 const express = require('express')
-const{authenticateTokenMiddleware}= require('../middleware/middleware')
 const {createTodo,getASingleTodo, updateTodo, deleteTodo, getAllTodo, inviteUser } = require("../controllers/controllers")
 const router = express.Router()
-router.post('/invite',authenticateTokenMiddleware,inviteUser)
+router.post('/invite',inviteUser)
 
-router.post('/create',authenticateTokenMiddleware,createTodo)
-router.get('/',authenticateTokenMiddleware,getAllTodo)
-router.get('/:id',authenticateTokenMiddleware ,getASingleTodo)
-router.put('/:id',authenticateTokenMiddleware,updateTodo)
-router.delete('/:id',authenticateTokenMiddleware,deleteTodo)
+router.post('/create',createTodo)
+router.get('/',getAllTodo)
+router.get('/:id' ,getASingleTodo)
+router.put('/:id',updateTodo)
+router.delete('/:id',deleteTodo)
    
 
 module.exports={

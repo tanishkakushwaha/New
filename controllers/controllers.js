@@ -5,15 +5,20 @@ const {PrismaClient} = require("@prisma/client")
 const prisma = new PrismaClient()
 const crypto = require("crypto")
 const{sendEmail} = require('../tools/sendEmail')
+const { signupSchema, loginSchema, inviteSchema } = require("../schemas/schema")
 
 const signup = async(req, res)=>{
     try {
         const {email, password, name} = req.body
-    if(!email || !password){
-        return res.status(400).json({
-            "message":"Email or password is missing"
+        // email ke checks
+        const validationResult = signupSchema.safeParse({
+            name,email,password
         })
-    }
+        if(validationResult.success === false){
+            return res.status(400).json({
+                "message":"Invalid input data"
+            })
+        }
     const existingUser = await prisma.user.findUnique({where:{email}})
     if(existingUser){
         return res.status(400).json({message:"User already exists"})
@@ -48,10 +53,15 @@ const signup = async(req, res)=>{
 const login = async(req, res)=>{
     try {
         const {email, password} = req.body  
-    if(!email || !password){
-        return res.status(400).json({message:"Email or password is missing"
+        const validationResult = loginSchema.safeParse({
+            email,password
         })
-    }
+        if(validationResult.success === false){
+            return res.status(400).json({
+                "message":"Invalid input data"
+            })
+        }
+
     const user = await prisma.user.findUnique({
         where:{
             email: email
@@ -92,6 +102,16 @@ const login = async(req, res)=>{
 const inviteUser = async(req,res)=>{
     try{
         const{email}=req.body
+            const validationResult = inviteSchema.safeParse({
+
+            email
+        })
+        if(validationResult.success === false){
+            return res.status(400).json({
+                "message":"Invalid input data"
+            })
+        }
+
         const invitedUser = await prisma.user.findUnique({where:{email:email}
         })
         if(!invitedUser){
@@ -167,6 +187,7 @@ catch(error){
 const getASingleTodo = async(req,res)=>{
     try{
         const todoId= parseInt(req.params.id)
+        
         const ownerOfTodo = await prisma.todo.findUnique({
             where:{id:todoId},
             select:{userId:true}
