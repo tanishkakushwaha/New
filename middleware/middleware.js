@@ -12,17 +12,18 @@ function authenticateTokenMiddleware(req, res, next){
                 "message":"Invalid token"
             })
         }
-        if(decoded.isVerified && req.route.path!=="/resend-email"){
+        req.user = decoded
+        if(!decoded.isVerified && req.path!=="/resend-email"){
             return res.status(400).json({message:"User not verified,verify your account to contiune"})
         }
-        req.user = decoded
+            next()
+
     } catch (error) {
         console.log(error)
         return res.status(401).json({
             "message":"Invalid token"
         })
     }
-    next()
 }
 
 

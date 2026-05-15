@@ -1,4 +1,3 @@
-// Tanishka
 const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const {PrismaClient} = require("@prisma/client")
@@ -14,7 +13,7 @@ const signup = async(req, res)=>{
             "message":"Email or password is missing"
         })
     }
-    const existingUser = await prisma.user.findUnique({where:{email}})
+    const existingUser = await prisma.user.findFirst({where:{email}})
     if(existingUser){
         return res.status(400).json({message:"User already exists"})
     }
@@ -34,9 +33,9 @@ const signup = async(req, res)=>{
         }
     })
     const subject ="verify Your Email-TodoApp"
-    const text = "verify your email using the link:"+'${process.env.Base_URL}/verify?token=${token}'
+    const text = `verify your email using the link:http://localhost:5173/verify?token=${token}`
     await sendEmail(createdUser.email,subject,text)
-    return res.status(200).json(createdUser)
+    return res.status(200).json({success:true,message:"User created successfully"})
     } catch (error) {
         console.log(error)
         res.status(500).json({
@@ -60,9 +59,7 @@ const login = async(req, res)=>{
     if(!user){
         return res.status(404).json({message:"User not found"})
     }
-    if(!user.isVerified){
-        return res.status(400).json({message:"Please verify your email First"})
-    }
+    
     const isValidPassword = await bcrypt.compare(password, user.password)
     if(!isValidPassword){
         return res.status(401).json({message:"Invalid password"})
@@ -75,7 +72,7 @@ const login = async(req, res)=>{
     }
 
     const token = jwt.sign(objectForToken, process.env.JWT_SECRET, {
-        expiresIn: "24h"
+        expiresIn: "48h"
     })
     return res.status(200).json({
         "success": true,
@@ -99,7 +96,7 @@ const inviteUser = async(req,res)=>{
         }
         const userIdOfInvitedUser = invitedUser.id
         const currentUser = await prisma.user.findUnique({where:{id:req.user.id}})
-         if(currentUser.invitedUsers && currentUser.invitedUsers.includes(userIdOfInvitedUser)){
+         if(currentUser.invitedUsers && currentUser.invitedUsers?.includes(userIdOfInvitedUser)){
             return res.status(400).json({message:"User already accesses"})
          }
 
@@ -133,7 +130,7 @@ const verify = async(req,res)=>{
             isVerified:true
         }
         })
-        return res.status(200).send("User Verified Successfull")
+        return res.status(200).json({success:true,message:"User Verified Successfully"})
     }
 catch(error){
     console.log(error)
@@ -143,6 +140,9 @@ catch(error){
 
 const resendEmail = async(req,res)=>{
     try{
+        if(!req.user){
+            return res.status(400).json({message:"Unauthorized"})
+        }
         const token = crypto.randomBytes(32).toString("hex")
         await prisma.verificationToken.create({
             data:{
@@ -151,7 +151,7 @@ const resendEmail = async(req,res)=>{
             }
         })
         const subject = "verify Your Email-TodoApp"
-        const text = `Verify your email using the link:${process.env.BASE_URL}/verify?token+${token}`
+        const text = `Verify your email using the link:http://localhost:5173/verify?token=${token}`
 
         await sendEmail(req.user.email,subject,text)
 
@@ -248,10 +248,10 @@ const updateTodo = async (req, res) => {
         const detailsOfTheOwner = await prisma.user.findUnique({where:{id:ownerOfTodo.userId },select:{invitedUsers:true}})
         let todo
         if(detailsOfTheOwner.invitedUsers?.includes(req.user.id)){
-            todo = await prisma.todo.findUnique({where:{id:todoId,userId:ownerOfTodo.userId}})
+            todo = await prisma.todo.findFirst({where:{id:todoId,userId:ownerOfTodo.userId}})
         } 
         else{
-            todo = await prisma.todo.findUnique({where:{id:todoId,userId:req.user.id}})
+            todo = await prisma.todo.findFirst({where:{id:todoId,userId:req.user.id}})
         }
         if(!todo){
             return res.status(404).json({message:"Todo not found"})
@@ -278,10 +278,10 @@ const deleteTodo = async(req, res)=>{
 
         let todo
         if(detailsOfTheOwner.invitedUsers?.includes(req.user.id)){
-            todo = await prisma.todo.findUnique({where:{id:todoId,userId:ownerOfTodo.userId}})
+            todo = await prisma.todo.findFirst({where:{id:todoId,userId:ownerOfTodo.userId}})
         } 
         else{
-            todo = await prisma.todo.findUnique({where:{id:todoId,userId:req.user.id}})
+            todo = await prisma.todo.findFirst({where:{id:todoId,userId:req.user.id}})
         }
         if(!todo) return res.status(404).json({message:"Todo not found"})
 
@@ -294,9 +294,70 @@ const deleteTodo = async(req, res)=>{
     }
 }
 
-  
+const forgotPassword = async(req,res)=>{
+    try{
+        const{email}=req.body
+        if(!email){
+            return res.status(400).json({message:"Email is required"})
+        }
+        const user = await prisma.user.findUnique({where:{email}})
+        if(!user){
+            return res.status(400).json({message:"User not found"})
+        }
+        const resetToken = crypto.randomBytes(32).toString("hex")
+        await prisma.user.update({where:{email},data:{resetToken,resetTokenExpiry:new Date( Date.now() + 15 * 60 * 1000)}})
+        const resetLink=`http://localhost:5173/reset-password?token=${resetToken}`
+        await sendEmail(email,"Reset your Password",`Click here to reset your password:${resetLink}`)
+        return res.status(200).json({
+            success:true,
+            message:"Reset link sent to email"
+        })
+    }
+    catch(error){
+        console.error("Forgot password error:",error)
+        return res.status(500).json({message: error.message})
+    }
+}
 
 
+const resetPassword = async(req,res)=>{
+    try{
+        const token = req.body.token?.trim()
+        const password = req.body.password?.trim()
+
+        console.log("TOKEN RECEIVED:",token)
+        console.log("CURRENT TIME:",new Date())
+        if(!token||!password){
+            return res.status(400).json({
+                message:"Token and password missing"
+            })
+        }
+        const user = await prisma.user.findFirst({where:{resetToken:token,resetTokenExpiry:{gt:new Date()}}})
+        console.log("USER FOUND:",user)
+        if(!user){
+            return res.status(400).json({message:"Invalid or expired token"})
+        }
+        const hashedPassword = await bcrypt.hash(password,10)
+        await prisma.user.update({
+            where:{id:user.id},
+            data:{
+                password:hashedPassword,
+                resetToken:null,
+                resetTokenExpiry:null
+            }
+        })
+        return res.status(200).json({
+            success:true,
+            message:"Password reset successful"
+        })
+    }
+    catch(error){
+        console.log(error)
+        return res.status(500).json({
+            message:"Internal server erroe"
+        })
+    }
+}
 
 module.exports = {
     signup,
@@ -307,7 +368,8 @@ module.exports = {
     getASingleTodo,
     updateTodo,
     deleteTodo,
-    inviteUser,
     verify,
-    resendEmail
+    resendEmail,
+    forgotPassword,
+    resetPassword
 }
